@@ -1,4 +1,5 @@
 #include <stdio.h>
+<<<<<<< HEAD
 #include <stdbool.h>
 
 // custom function to check if a number is prime
@@ -27,6 +28,32 @@ int main(void) {
     } else {
         printf("Result: %d is NOT a prime number.\n", given);
     }
+=======
+
+/*
+    Task:
+    Write a function `int is_prime(int n)` that returns 1 if n is prime,
+    0 otherwise.
+
+    In main():
+      - Ask user for an integer n (>= 2)
+      - If invalid, print an error
+      - Otherwise, print all prime numbers up to n
+*/
+
+int is_prime(int n) {
+    // TODO: check if n is prime using loop up to sqrt(n)
+    return 0; // placeholder
+}
+
+int main(void) {
+    int n;
+
+    printf("Enter an integer n (>= 2): ");
+    scanf("%d", &n);
+
+    // TODO: validate input and print all primes up to n
+>>>>>>> 6275a13ea42e7fac345dbfa2230c9d49608be1d4
 
     return 0;
 }
