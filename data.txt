@@ -1,0 +1,3 @@
+C programming with files.
+Testing file writing using fprintf.
+End of text block.

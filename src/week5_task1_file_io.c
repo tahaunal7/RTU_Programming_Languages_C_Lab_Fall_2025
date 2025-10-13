@@ -1,27 +1,45 @@
 // week5_task1_file_io.c
-// Task 1: Read and write data from text files
+// Author: Mehmet Taha Ünal
+// Student ID: 231AMB077
 // Week 5 – Files & Modular Programming
-// TODO: Fill in the missing parts marked below.
+// Task 1: File writing and reading example (custom version)
 
 #include <stdio.h>
 #include <stdlib.h>
 
 int main(void) {
-    FILE *fp;
-    char filename[100] = "data.txt";
-    char line[256];
+    FILE *fileptr;
+    char fname[] = "data.txt";
+    char buffer[200];
 
-    // TODO: 1. Open file for writing (mode = "w")
-    // TODO: 2. Check if file opened successfully
-    // TODO: 3. Write 2–3 lines of text to the file using fprintf()
-    // TODO: 4. Close the file
+    // Write section
+    fileptr = fopen(fname, "w");
+    if (!fileptr) {
+        fprintf(stderr, "Cannot create file: %s\n", fname);
+        return EXIT_FAILURE;
+    }
 
-    // TODO: 5. Open file again for reading (mode = "r")
-    // TODO: 6. Use fgets() in a loop to read and print each line to the console
-    // TODO: 7. Close the file
+    printf(">>> Creating and writing to '%s'\n", fname);
+    fprintf(fileptr, "C programming with files.\n");
+    fprintf(fileptr, "Testing file writing using fprintf.\n");
+    fprintf(fileptr, "End of text block.\n");
+    fclose(fileptr);
 
-    // BONUS: ask user for filename instead of using default "data.txt"
-    // BONUS: count number of lines read
+    // Read section
+    fileptr = fopen(fname, "r");
+    if (!fileptr) {
+        fprintf(stderr, "Cannot open file for reading: %s\n", fname);
+        return EXIT_FAILURE;
+    }
 
-    return 0;
+    printf("\n>>> Now displaying file content:\n");
+    int line_no = 1;
+    while (fgets(buffer, sizeof(buffer), fileptr) != NULL) {
+        printf("[%d] %s", line_no++, buffer);
+    }
+
+    fclose(fileptr);
+    printf("\n>>> Reading complete.\n");
+
+    return EXIT_SUCCESS;
 }

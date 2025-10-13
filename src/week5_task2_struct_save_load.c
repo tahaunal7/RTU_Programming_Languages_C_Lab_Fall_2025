@@ -1,49 +1,70 @@
 // week5_task2_struct_save_load.c
-// Task 2: Save and load structured records from a file
+// Author: Mehmet Taha Ünal
+// Student ID: 231AMB077
 // Week 5 – Files & Modular Programming
-// TODO: Complete function implementations and file handling logic.
+// Task 2: Save and Load a Student Record (text file version)
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-#define MAX_NAME_LEN 50
 
 typedef struct {
-    char name[MAX_NAME_LEN];
+    char fullName[50];
     int age;
     float gpa;
 } Student;
 
-// Function prototypes
-void save_student(Student s, const char *filename);
-Student load_student(const char *filename);
+int save_student(const char *fname, const Student *s);
+int load_student(const char *fname, Student *s);
 
 int main(void) {
-    Student s1;
-    strcpy(s1.name, "Alice");
-    s1.age = 21;
-    s1.gpa = 3.75f;
+    Student original = {"ElifNaz", 21, 3.87f};
+    Student loaded;
+    const char *filename = "student_record.txt";
 
-    const char *filename = "student.txt";
+    printf(">>> Writing student to '%s'\n", filename);
+    if (save_student(filename, &original) != 0) {
+        fprintf(stderr, "Error: could not save data!\n");
+        return EXIT_FAILURE;
+    }
 
-    // TODO: Call save_student() to save student data to file
-    // TODO: Call load_student() to read data back into a new struct
-    // TODO: Print loaded data to confirm correctness
+    printf(">>> Reading data back from file...\n");
+    if (load_student(filename, &loaded) != 0) {
+        fprintf(stderr, "Error: could not load data!\n");
+        return EXIT_FAILURE;
+    }
 
+    printf("\n>>> Loaded Student Record <<<\n");
+    printf("Name: %s\n", loaded.fullName);
+    printf("Age: %d\n", loaded.age);
+    printf("GPA: %.2f\n", loaded.gpa);
+
+    // second record example
+    Student second = {"DefneGoker", 23, 3.94f};
+    save_student("student_record2.txt", &second);
+    printf("\nSaved another record: %s, Age %d, GPA %.2f\n",
+           second.fullName, second.age, second.gpa);
+
+    return EXIT_SUCCESS;
+}
+
+int save_student(const char *fname, const Student *s) {
+    FILE *fp = fopen(fname, "w");
+    if (!fp) return 1;
+
+    fprintf(fp, "%s %d %.2f\n", s->fullName, s->age, s->gpa);
+    fclose(fp);
     return 0;
 }
 
-// TODO: Implement save_student()
-// Open file for writing, check errors, write fields, then close file
-void save_student(Student s, const char *filename) {
-    // ...
-}
+int load_student(const char *fname, Student *s) {
+    FILE *fp = fopen(fname, "r");
+    if (!fp) return 1;
 
-// TODO: Implement load_student()
-// Open file for reading, check errors, read fields, then close file
-Student load_student(const char *filename) {
-    Student s;
-    // ...
-    return s;
+    if (fscanf(fp, "%49s %d %f", s->fullName, &s->age, &s->gpa) != 3) {
+        fclose(fp);
+        return 2;
+    }
+
+    fclose(fp);
+    return 0;
 }
