@@ -12,7 +12,6 @@ int main(void) {
     char fname[] = "data.txt";
     char buffer[200];
 
-    // Write section
     fileptr = fopen(fname, "w");
     if (!fileptr) {
         fprintf(stderr, "Cannot create file: %s\n", fname);
@@ -25,7 +24,6 @@ int main(void) {
     fprintf(fileptr, "End of text block.\n");
     fclose(fileptr);
 
-    // Read section
     fileptr = fopen(fname, "r");
     if (!fileptr) {
         fprintf(stderr, "Cannot open file for reading: %s\n", fname);
