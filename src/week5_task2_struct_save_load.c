@@ -38,7 +38,6 @@ int main(void) {
     printf("Age: %d\n", loaded.age);
     printf("GPA: %.2f\n", loaded.gpa);
 
-    // second record example
     Student second = {"DefneGoker", 23, 3.94f};
     save_student("student_record2.txt", &second);
     printf("\nSaved another record: %s, Age %d, GPA %.2f\n",
