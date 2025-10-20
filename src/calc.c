@@ -1,9 +1,5 @@
 // Mehmet Taha Ünal 231AMB077
 // Compile: gcc -O2 -Wall -Wextra -std=c17 -o calc calc.c
-// Description:
-// Fully standalone Python-like arithmetic parser in C.
-// Supports +, -, *, /, **, parentheses, floats, and comment lines.
-// Writes result to output file and shows it in terminal. No -lm dependency.
 
 #include <stdio.h>
 #include <stdlib.h>
