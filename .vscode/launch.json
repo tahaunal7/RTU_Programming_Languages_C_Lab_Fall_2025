@@ -1,26 +1,25 @@
-
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Debug Hello (gdb)",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/bin/hello",
-      "args": ["Alice", "42"],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}",
-      "environment": [],
-      "externalConsole": false,
-      "MIMode": "gdb",
-      "setupCommands": [
+    "version": "0.2.0",
+    "configurations": [
         {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
+            "name": "Run calc.c (GCC)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/calc",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "C/C++: gcc build active file"
         }
-      ],
-      "preLaunchTask": "Build All (Make)"
-    }
-  ]
+    ]
 }
