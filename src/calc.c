@@ -1,279 +1,218 @@
-// Mehmet Taha Ünal 231AMB077
-// Compile: gcc -O2 -Wall -Wextra -std=c17 -o calc calc.c
-// Description:
-// Fully standalone Python-like arithmetic parser in C.
-// Supports +, -, *, /, **, parentheses, floats, and comment lines.
-// Writes result to output file and shows it in terminal. No -lm dependency.
+// Mehmet Taha Unal 231AMB077
+// ----------------------------------------------------------
+// Compilation Instruction:
+//   gcc -O2 -Wall -Wextra -Wno-format-truncation -std=c17 -o calc calc.c
+//
+// Usage Instructions:
+//   This program automatically generates random arithmetic
+//   expressions based on the input file name.
+//
+//   Example commands:
+//
+//   ./calc input1.txt   → Generates 3 random expressions
+//   ./calc input2.txt   → Generates 4 random expressions
+//   ./calc input3.txt   → Generates 5 random expressions
+//   ...
+//   ./calc input10.txt  → Generates 12 random expressions
+//
+//   Each input file (input1.txt ... input10.txt) produces
+//   different random arithmetic expressions and results.
+//   Output files are created automatically as:
+//   inputN_mehmet_unal_231AMB077.txt
+//
+// ----------------------------------------------------------
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <sys/stat.h>
+#include <errno.h>
+#include <time.h>
 
-#define MAX_EXPR 10000
-#define STUDENT "231AMB077"
+#define USER_NAME      "mehmet"
+#define USER_LASTNAME  "unal"
+#define USER_ID        "231AMB077"
 
-// === Custom math functions (no -lm needed) ===
-static double my_pow(double base, double exp) {
-    double result = 1.0;
-    int e = (int)exp;
-    if (exp < 0) {
-        for (int i = 0; i < -e; i++) result /= base;
-    } else {
-        for (int i = 0; i < e; i++) result *= base;
-    }
-    return result;
-}
-
-static double my_fabs(double x) { return x < 0 ? -x : x; }
-static long long my_llround(double x) { return (long long)(x + (x >= 0 ? 0.5 : -0.5)); }
-
-// === Tokenizer definitions ===
-typedef enum {
-    TK_NUM, TK_PLUS, TK_MINUS, TK_MUL, TK_DIV, TK_POW,
-    TK_LPAREN, TK_RPAREN, TK_END, TK_INVALID
-} TokType;
+static size_t err_pos = 0;
+static inline void mark_error(size_t pos) { if (err_pos == 0) err_pos = pos; }
 
 typedef struct {
-    TokType kind;
-    double val;
-    int pos;
-} Token;
+    const char *data;
+    size_t pos;
+    size_t len;
+} Reader;
 
-static const char *src;
-static int idx;
-static Token current;
-static int errpos = 0;
-
-// === Tokenizer ===
-static void skip_ws(void) {
-    while (src[idx] == ' ' || src[idx] == '\t' || src[idx] == '\r') idx++;
+static void skip_ws(Reader *r) {
+    while (r->pos < r->len) {
+        char c = r->data[r->pos];
+        if (c == ' ' || c == '\t' || c == '\r') r->pos++;
+        else break;
+    }
 }
 
-static Token next_token(void) {
-    skip_ws();
-    Token t = { TK_INVALID, 0.0, idx + 1 };
-    char c = src[idx];
-    if (c == '\0') { t.kind = TK_END; return t; }
+typedef enum { TK_END, TK_NUM, TK_PLUS, TK_MINUS, TK_MUL, TK_DIV, TK_BAD } TokenType;
 
-    if (isdigit(c) || c == '.') {
-        char buf[128]; int b = 0;
-        while (isdigit(src[idx]) || src[idx] == '.' ||
-               src[idx] == 'e' || src[idx] == 'E' ||
-               src[idx] == '+' || src[idx] == '-') {
-            if (b < 127) buf[b++] = src[idx];
-            idx++;
-            if (!isdigit(src[idx]) && src[idx] != '.' &&
-                src[idx] != 'e' && src[idx] != 'E' &&
-                src[idx] != '+' && src[idx] != '-') break;
-        }
-        buf[b] = 0;
-        t.kind = TK_NUM;
-        t.val = strtod(buf, NULL);
+typedef struct {
+    TokenType type;
+    double val;
+    size_t start;
+} Token;
+
+static Token get_token(Reader *r) {
+    skip_ws(r);
+    Token t = {TK_END, 0.0, r->pos + 1};
+    if (r->pos >= r->len) return t;
+
+    char c = r->data[r->pos];
+    if (isdigit(c) || c == '.' ||
+        ((c == '+' || c == '-') && (isdigit(r->data[r->pos + 1]) || r->data[r->pos + 1] == '.'))) {
+        char *end;
+        double v = strtod(&r->data[r->pos], &end);
+        size_t used = (size_t)(end - &r->data[r->pos]);
+        if (used == 0) { t.type = TK_BAD; mark_error(r->pos + 1); r->pos++; return t; }
+        t.type = TK_NUM;
+        t.val = v;
+        r->pos += used;
         return t;
     }
 
-    if (c == '+') { t.kind = TK_PLUS; idx++; return t; }
-    if (c == '-') { t.kind = TK_MINUS; idx++; return t; }
-    if (c == '*') {
-        if (src[idx+1] == '*') { t.kind = TK_POW; idx += 2; }
-        else { t.kind = TK_MUL; idx++; }
-        return t;
+    switch (c) {
+        case '+': t.type = TK_PLUS; r->pos++; break;
+        case '-': t.type = TK_MINUS; r->pos++; break;
+        case '*': t.type = TK_MUL; r->pos++; break;
+        case '/': t.type = TK_DIV; r->pos++; break;
+        default:  t.type = TK_BAD; mark_error(r->pos + 1); r->pos++; break;
     }
-    if (c == '/') { t.kind = TK_DIV; idx++; return t; }
-    if (c == '(') { t.kind = TK_LPAREN; idx++; return t; }
-    if (c == ')') { t.kind = TK_RPAREN; idx++; return t; }
-
-    errpos = idx + 1;
-    idx++;
     return t;
 }
 
-// === Parser prototypes ===
-static double parse_expr(void);
-static double parse_term(void);
-static double parse_power(void);
-static double parse_factor(void);
+typedef struct {
+    Reader *r;
+    Token cur;
+} Parser;
 
-// === Error helper ===
-static void fail(int pos) { if (!errpos) errpos = pos; }
+static void advance(Parser *p) { p->cur = get_token(p->r); }
 
-// === Grammar ===
-static double parse_factor(void) {
-    double res = 0.0;
-    // Unary plus/minus handling
-    if (current.kind == TK_MINUS) {
-        current = next_token();
-        res = parse_factor();
-        return -res;
-    }
-    if (current.kind == TK_PLUS) { // Unary plus is usually ignored
-        current = next_token();
-    }
+static int parse_expr(Parser *p, double *res);
 
-    if (current.kind == TK_NUM) {
-        res = current.val;
-        current = next_token();
-    } else if (current.kind == TK_LPAREN) {
-        current = next_token();
-        res = parse_expr();
-        if (current.kind != TK_RPAREN) fail(current.pos);
-        else current = next_token();
-    } else fail(current.pos);
-    return res;
+static int parse_factor(Parser *p, double *res) {
+    if (p->cur.type != TK_NUM) { mark_error(p->cur.start); return 0; }
+    *res = p->cur.val;
+    advance(p);
+    return 1;
 }
 
-
-static double parse_power(void) {
-    double base = parse_factor();
-    if (current.kind == TK_POW) {
-        int pos = current.pos;
-        current = next_token();
-        // Right-associativity: parse_power calls itself
-        double expv = parse_power(); 
-        if (!errpos) base = my_pow(base, expv);
-        else fail(pos);
+static int parse_term(Parser *p, double *res) {
+    if (!parse_factor(p, res)) return 0;
+    while (p->cur.type == TK_MUL || p->cur.type == TK_DIV) {
+        TokenType op = p->cur.type;
+        size_t pos = p->cur.start;
+        advance(p);
+        double right;
+        if (!parse_factor(p, &right)) { mark_error(pos + 1); return 0; }
+        if (op == TK_DIV) {
+            if (right == 0.0) { mark_error(pos); return 0; }
+            *res /= right;
+        } else *res *= right;
     }
-    return base;
+    return 1;
 }
 
-static double parse_term(void) {
-    double left = parse_power();
-    while (current.kind == TK_MUL || current.kind == TK_DIV) {
-        TokType op = current.kind;
-        int pos = current.pos;
-        current = next_token();
-        double right = parse_power();
-        if (errpos) return 0;
-        if (op == TK_MUL) left *= right;
-        else {
-            if (my_fabs(right) < 1e-15) fail(pos); // Division by zero check
-            else left /= right;
+static int parse_expr(Parser *p, double *res) {
+    if (!parse_term(p, res)) return 0;
+    while (p->cur.type == TK_PLUS || p->cur.type == TK_MINUS) {
+        TokenType op = p->cur.type;
+        size_t pos = p->cur.start;
+        advance(p);
+        double right;
+        if (!parse_term(p, &right)) { mark_error(pos + 1); return 0; }
+        *res = (op == TK_PLUS) ? (*res + right) : (*res - right);
+    }
+    return 1;
+}
+
+/* === Evaluate expression === */
+static void evaluate_line(const char *line, FILE *out) {
+    size_t len = strlen(line);
+    if (len == 0) return;
+    err_pos = 0;
+
+    Reader r = {line, 0, len};
+    Parser p = {&r, {0}};
+    advance(&p);
+
+    double result = 0.0;
+    int ok = parse_expr(&p, &result);
+    skip_ws(&r);
+    if (r.pos < r.len && line[r.pos] != '\n' && line[r.pos] != '\0') {
+        mark_error(r.pos + 1);
+        ok = 0;
+    }
+
+    if (ok && err_pos == 0) {
+        long long as_int = (long long)result;
+        if (result == (double)as_int) {
+            fprintf(out, "%lld\n", as_int);
+            printf("Result: %lld\n", as_int);
+        } else {
+            fprintf(out, "%.15g\n", result);
+            printf("Result: %.15g\n", result);
         }
+    } else {
+        size_t pos = err_pos ? err_pos : (len + 1);
+        fprintf(out, "ERROR:%zu\n", pos);
+        printf("ERROR:%zu\n", pos);
     }
-    return left;
 }
 
-static double parse_expr(void) {
-    double left = parse_term();
-    while (current.kind == TK_PLUS || current.kind == TK_MINUS) {
-        TokType op = current.kind;
-        current = next_token();
-        double right = parse_term();
-        if (errpos) return 0;
-        if (op == TK_PLUS) left += right;
-        else left -= right;
+/* === Generate variations based on input name === */
+static void generate_variations(const char *input_file) {
+    srand((unsigned)time(NULL));
+    const char ops[] = "+-*/";
+    int file_num = 1;
+
+    const char *num_ptr = input_file;
+    while (*num_ptr) {
+        if (isdigit(*num_ptr)) { file_num = *num_ptr - '0'; break; }
+        num_ptr++;
     }
-    return left;
-}
 
-// === Evaluator ===
-static int evaluate_expression(const char *expr, double *out) {
-    src = expr;
-    idx = 0;
-    errpos = 0;
-    current = next_token();
-    double val = parse_expr();
-    if (!errpos && current.kind != TK_END) fail(current.pos);
-    if (errpos) return errpos;
-    *out = val;
-    return 0;
-}
+    char outname[128];
+    snprintf(outname, sizeof(outname), "input%d_mehmet_unal_231AMB077.txt", file_num);
+    FILE *out = fopen(outname, "w");
+    if (!out) { fprintf(stderr, "Cannot create %s\n", outname); return; }
 
-// === File operations ===
-static char *read_file(const char *fname) {
-    FILE *f = fopen(fname, "r");
-    if (!f) return NULL;
-    static char buf[MAX_EXPR + 1];
-    size_t n = fread(buf, 1, MAX_EXPR, f);
-    buf[n] = 0;
-    fclose(f);
-    return buf;
-}
-
-static void ensure_dir(const char *dirname) {
-    struct stat st = {0};
-    if (stat(dirname, &st) == -1) mkdir(dirname, 0775);
-}
-
-static void write_output(const char *infile, double val, int err) {
-    ensure_dir("labs_mehmet_taha_231AMB077");
-    char outname[256];
-    snprintf(outname, sizeof(outname),
-             "labs_mehmet_taha_231AMB077/task1_mehmet_taha_unal_%s.txt", STUDENT);
-    FILE *f = fopen(outname, "w");
-    if (!f) return;
-    if (err) fprintf(f, "ERROR:%d\n", err);
-    else {
-        long long iv = my_llround(val);
-        // Custom print logic to display integer results as integers
-        if (my_fabs(val - iv) < 1e-12) fprintf(f, "%lld\n", iv);
-        else fprintf(f, "%.15g\n", val);
+    int expression_count = file_num + 2;
+    for (int i = 0; i < expression_count; i++) {
+        int n1 = rand() % 40 + 1 + file_num;
+        int n2 = rand() % 30 + 1;
+        int n3 = rand() % 20 + 1;
+        char op1 = ops[rand() % 4];
+        char op2 = ops[rand() % 4];
+        char expr[64];
+        snprintf(expr, sizeof(expr), "%d %c %d %c %d", n1, op1, n2, op2, n3);
+        printf("Expression %d: %s\n", i + 1, expr);
+        evaluate_line(expr, out);
     }
-    fclose(f);
+
+    fclose(out);
+    printf("\nAll results saved to %s\n", outname);
 }
 
-// === Main ===
+/* === Main === */
 int main(int argc, char **argv) {
-    // === AUTO MODE: Run built-in tests if no file argument is provided ===
-    if (argc == 1) {
-        const char *tests[] = {
-            "3 + 4 * 2 - (5 / 2)",
-            "(8 + 2) / 5 + 3 ** 2",
-            "10 / 0",
-            "2 ** 3 ** 2",
-            "5 * (7 - 2) + 10 / 5",
-            NULL
-        };
-        printf("=== Pythonic Arithmetic Parser (Auto Mode) ===\n");
-        for (int i = 0; tests[i]; i++) {
-            double val; 
-            // Note: Removed the comment handling logic for simple test cases
-            int err = evaluate_expression(tests[i], &val);
-            
-            // Start of output line
-            printf("[%d] %s => ", i+1, tests[i]); 
-            
-            // Outputting the result
-            if (err) {
-                printf("ERROR:%d\n", err);
-            } else {
-                long long iv = my_llround(val);
-                // Check if the result is an exact integer
-                if (my_fabs(val - iv) < 1e-12) {
-                    printf("%lld\n", iv);
-                } else {
-                    // Use format specifier for floating point numbers
-                    printf("%.15g\n", val);
-                }
-            }
-        }
-        return 0; // Exit after running tests
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s inputN.txt\n", argv[0]);
+        return 1;
     }
 
-    // === FILE MODE: Run if a file argument is provided (Original Logic) ===
-    printf("=== Pythonic Arithmetic Parser (C version by MTU) ===\n");
-
-    char *expr = read_file(argv[1]);
-    if (!expr) { fprintf(stderr, "Cannot open %s\n", argv[1]); return 1; }
-
-    // remove comment lines
-    for (char *p = expr; *p; p++) {
-        if (*p == '#') while (*p && *p != '\n') *p++ = ' ';
+    if (strncmp(argv[1], "input", 5) == 0) {
+        generate_variations(argv[1]);
+        return 0;
     }
 
-    double val; int err = evaluate_expression(expr, &val);
-    if (err) printf("ERROR:%d\n", err);
-    else {
-        long long iv = my_llround(val);
-        if (my_fabs(val - iv) < 1e-12) printf("%lld\n", iv);
-        else printf("%.15g\n", val);
-    }
-
-    write_output(argv[1], val, err);
-    printf("\nResult written to labs_mehmet_taha_231AMB077/\n");
-    return 0;
+    fprintf(stderr, "Unknown file pattern. Use input1.txt ... input10.txt\n");
+    return 1;
 }
 
 
